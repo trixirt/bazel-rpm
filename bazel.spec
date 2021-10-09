@@ -1,116 +1,117 @@
-# they warn against fetching source ... but it's so convenient :-\
+Name:           bazel
+Version:        3.7.2
+Release:        1%{?dist}
+Summary:        A java based build system
+License:        ASL 2.0
+ExclusiveArch:  x86_64
 
-%define _disable_source_fetch 0
-
-Name:           bazel4
-Version:        4.2.1
-Release:        0%{?dist}
-Summary:        Correct, reproducible, and fast builds for everyone.
-License:        Apache License 2.0
 URL:            http://bazel.io/
 Source0:        https://github.com/bazelbuild/bazel/releases/download/%{version}/bazel-%{version}-dist.zip
 
-# FIXME: Java 11 log.warning generates backtrace
+# Silince log.warning bactrace
+# From the original baze4 project
 Patch1:         bazel-1.0.0-log-warning.patch
+# Fixes up some include problems with the bootstapped bazel
+# From the original baze4 project
 Patch2:         bazel-gcc.patch
+# For man pages
+# From https://github.com/bazelbuild/bazel/pull/12028/commits
+# Fuzzing of 0 makes it difficult to use.
+# This patch is for 4.2.1
+Patch3:         bazel-manpage.patch
 
-# for folks with 'bazel' v1 package installed
-Conflicts:      bazel
-Conflicts:      bazel2
-
+BuildRequires:  bash-completion
 BuildRequires:  java-11-openjdk-devel
-#BuildRequires:  java-1_8_0-openjdk-headless ## OpenSUSE
-#BuildRequires:  java-1.8.0-openjdk-headless ## Mageia
 BuildRequires:  zlib-devel
-BuildRequires:  pkgconfig(bash-completion)
 BuildRequires:  findutils
 BuildRequires:  gcc-c++
 BuildRequires:  which
 BuildRequires:  unzip
 BuildRequires:  zip
-
-# only for centos7/rhel7. rhel8 has `python3`.
-%if 0%{?rhel} > 6 && 0%{?rhel} < 8
-BuildRequires:  python
-%else
 BuildRequires:  python3
-%endif
 
-Requires:       java-11-openjdk-devel
-#Requires:       java-1_8_0-openjdk-headless ## OpenSUSE
-#Requires:       java-1.8.0-openjdk-headless ## Mageia
+Requires:       bash
+Requires:       java-11-openjdk
 
+# where to install the bazel-complete.bash file
 %define bashcompdir %(pkg-config --variable=completionsdir bash-completion 2>/dev/null)
+# No debug package
 %global debug_package %{nil}
-%define __os_install_post %{nil}
+# Normally stripping is fine, however the bazel exe
+# is a wrapper around a zip archive and stripping it destoys the archive
+# See issue here  https://github.com/vbatts/copr-build-bazel/issues/4
+# Stripping exe's is one of several things done in os post install
+# Since there is only 1 exe, just disable brp-strip
+%define __brp_strip %{nil}
+# The bazel wrapper has a fine grained version handling bazel-<version>-<os_arch_suffix>
+%define bazel_version %{version}-linux-%{_arch}
 
 %description
-Correct, reproducible, and fast builds for everyone.
+A java based build system.
 
 %prep
 %setup -q -c -n bazel-%{version}
 %patch1 -p0
 %patch2 -p0
+%if "%{version}" == "4.2.1"
+%patch3 -p1
+%endif
+# Fix the license file being distributed with execute permissions.
+chmod a-x LICENSE
 
 %build
-%if 0%{?rhel} > 6 && 0%{?rhel} < 8
-export EXTRA_BAZEL_ARGS="${EXTRA_BAZEL_ARGS} --host_force_python=PY2"
-%else
-# thanks to @aehlig for this tip: https://github.com/bazelbuild/bazel/issues/8665#issuecomment-503575270
-find . -type f -regextype posix-extended -iregex '.*(sh|txt|py|_stub|stub_.*|bazel|get_workspace_status|protobuf_support|_so)' -exec %{__sed} -i -e '1s|^#!/usr/bin/env python$|#!/usr/bin/env python3|' "{}" \;
-export EXTRA_BAZEL_ARGS="${EXTRA_BAZEL_ARGS} --python_path=/usr/bin/python3"
-
-# horrible of horribles, just to have `python` in the PATH
-# https://github.com/bazelbuild/bazel/issues/8665
-%{__mkdir_p} ./bin-hack
-%{__ln_s} /usr/bin/python3 ./bin-hack/python
-export PATH=$(pwd)/bin-hack:$PATH
-%endif
-
-%ifarch aarch64
-export EXTRA_BAZEL_ARGS="${EXTRA_BAZEL_ARGS} --nokeep_state_after_build --notrack_incremental_state --nokeep_state_after_build"
-%else
-%endif
-
-%ifarch s390x
-# increase heap size to addess s390x build failures
-export BAZEL_JAVAC_OPTS="-J-Xmx4g -J-Xms512m"
-%else
-%endif
-
-# loose epoch from their release date
+# Set the release date and version
 export SOURCE_DATE_EPOCH="$(date -d $(head -1 CHANGELOG.md | %{__grep} -Eo '\b[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}\b' ) +%s)"
 export EMBED_LABEL="%{version}"
-
-# for debugging's sake
-which g++
-g++ --version
-
-export TMPDIR=%{_tmppath}
-export CC=gcc
-export CXX=g++
-export EXTRA_BAZEL_ARGS="${EXTRA_BAZEL_ARGS} --sandbox_debug --host_javabase=@local_jdk//:jdk --verbose_failures --subcommands --explain=build.log --show_result=2147483647"
-%if 0%{?fedora} >= 34
-export CXXFLAGS="-include /usr/include/c++/11/limits -include /usr/include/c++/11/functional"
-export EXTRA_BAZEL_ARGS="${EXTRA_BAZEL_ARGS} --cxxopt=-include/usr/include/c++/11/limits"
-%endif
+# Uncomment for debugging
+# export CXXFLAGS="-g -O0"
+# Work around some compile problems
+export EXTRA_BAZEL_ARGS="--cxxopt=-include/usr/include/c++/11/limits"
+# bazel bootstraps then and builds itself again.
+# Use the project's script instead of expanding the script here.
 env ./compile.sh
+# Generate the bash completions
 env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/bazel-complete.bash
 
 %install
-%{__mkdir_p} %{buildroot}/%{_bindir}
+# license
+%{__mkdir_p} %{buildroot}%{_datadir}/bazel
+%{__cp} LICENSE %{buildroot}%{_datadir}/bazel/LICENSE
+%if "%{version}" == "4.2.1"
+# man page
+%{__mkdir_p} %{buildroot}%{_mandir}/man1
+%{__cp} bazel.1 %{buildroot}%{_mandir}/man1/
+%endif
+# bash completion
 %{__mkdir_p} %{buildroot}/%{bashcompdir}
-%{__cp} output/bazel %{buildroot}/%{_bindir}/bazel-real
-%{__cp} ./scripts/packages/bazel.sh %{buildroot}/%{_bindir}/bazel
 %{__cp} output/bazel-complete.bash %{buildroot}/%{bashcompdir}/bazel
-
-%clean
-%{__rm} -rf %{buildroot}
+# bazel and wrapper
+%{__mkdir_p} %{buildroot}/%{_bindir}
+%{__cp} output/bazel %{buildroot}/%{_bindir}/bazel-%{bazel_version}
+%{__cp} ./scripts/packages/bazel.sh %{buildroot}/%{_bindir}/bazel
 
 %files
-%defattr(-,root,root)
-%attr(0755,root,root) %{_bindir}/bazel
-%attr(0755,root,root) %{_bindir}/bazel-real
-%attr(0755,root,root) %{bashcompdir}/bazel
+%dir %{_datadir}/bazel
+%license %{_datadir}/bazel/LICENSE
+%if "%{version}" == "4.2.1"
+%{_mandir}/man1/bazel.1.gz
+%endif
+%{_bindir}/bazel
+%{_bindir}/bazel-%{bazel_version}
+%{bashcompdir}/bazel
+
+# Uncomment if you want to see the buildroot
+# ex/ to verify that bazel-real was not strippped
+# %clean
+# echo "no cleaning for you"
 
 %changelog
+* Wed Oct 13 2021 <trix@redhat.com> - 3.7.2-1
+- Change to 3.7.2 for building tensorflow
+- Change bazel-real to bazel-<version>-<os_arch_suffix>
+
+* Sun Oct 10 2021 <trix@redhat.com> - 4.2.1-1
+- Initial version
+- Forked from http://copr-dist-git.fedorainfracloud.org/git/vbatts/bazel/bazel4.git
+
+
