@@ -1,6 +1,6 @@
 Name:           bazel
 Version:        3.7.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A java based build system
 License:        ASL 2.0
 ExclusiveArch:  x86_64
@@ -31,7 +31,10 @@ BuildRequires:  zip
 BuildRequires:  python3
 
 Requires:       bash
-Requires:       java-11-openjdk
+# bazel assumes you are building something
+# If you only install java-11-openjdk you will see an error like
+# FATAL: Could not find system javabase. Ensure JAVA_HOME is set, or javac is on your PATH.
+Requires:       java-11-openjdk-devel
 
 # where to install the bazel-complete.bash file
 %define bashcompdir %(pkg-config --variable=completionsdir bash-completion 2>/dev/null)
@@ -106,6 +109,9 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 # echo "no cleaning for you"
 
 %changelog
+* Thu Oct 14 2021 <trix@redhat.com> - 3.7.2-2
+- Restore bazel4 requires on java-11-openjdk-devel
+
 * Wed Oct 13 2021 <trix@redhat.com> - 3.7.2-1
 - Change to 3.7.2 for building tensorflow
 - Change bazel-real to bazel-<version>-<os_arch_suffix>
