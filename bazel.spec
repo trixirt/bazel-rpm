@@ -1,7 +1,7 @@
 Name:           bazel
-Version:        3.7.2
-Release:        2%{?dist}
 Summary:        A java based build system
+Version:        3.7.2
+Release:        3%{?dist}
 License:        ASL 2.0
 ExclusiveArch:  x86_64
 
@@ -29,12 +29,19 @@ BuildRequires:  which
 BuildRequires:  unzip
 BuildRequires:  zip
 BuildRequires:  python3
+BuildRequires:  python-unversioned-command
+
+%description
+A java based build system.
 
 Requires:       bash
 # bazel assumes you are building something
 # If you only install java-11-openjdk you will see an error like
 # FATAL: Could not find system javabase. Ensure JAVA_HOME is set, or javac is on your PATH.
 Requires:       java-11-openjdk-devel
+
+%package devel
+Summary:        A java based build system
 
 # where to install the bazel-complete.bash file
 %define bashcompdir %(pkg-config --variable=completionsdir bash-completion 2>/dev/null)
@@ -48,8 +55,12 @@ Requires:       java-11-openjdk-devel
 %define __brp_strip %{nil}
 # The bazel wrapper has a fine grained version handling bazel-<version>-<os_arch_suffix>
 %define bazel_version %{version}-linux-%{_arch}
+# The bazel args workaround depends on the major verion of gcc to find the c++/limits file
+# Assume the first line looks like
+# gcc (GCC) 11.2.1 20210728 (Red Hat 11.2.1-1)
+%define gcc_major %(gcc --version | grep GCC | tr '.' ' ' | awk '{ print $3 }')
 
-%description
+%description devel
 A java based build system.
 
 %prep
@@ -66,10 +77,15 @@ chmod a-x LICENSE
 # Set the release date and version
 export SOURCE_DATE_EPOCH="$(date -d $(head -1 CHANGELOG.md | %{__grep} -Eo '\b[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}\b' ) +%s)"
 export EMBED_LABEL="%{version}"
-# Uncomment for debugging
-# export CXXFLAGS="-g -O0"
+# Recommended bootstrapping arg from
+# https://docs.bazel.build/versions/3.7.0/install-compile-source.html
+EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk"
 # Work around some compile problems
-export EXTRA_BAZEL_ARGS="--cxxopt=-include/usr/include/c++/11/limits"
+export EXTRA_BAZEL_ARGS="$EXTRA_BAZEL_ARGS --cxxopt=-include/usr/include/c++/%{gcc_major}/limits"
+# Use the real which
+# In the mock build, there is this build error
+# environment: line 1: which_declare: command not found
+unset -f which
 # bazel bootstraps then and builds itself again.
 # Use the project's script instead of expanding the script here.
 env ./compile.sh
@@ -93,7 +109,7 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 %{__cp} output/bazel %{buildroot}/%{_bindir}/bazel-%{bazel_version}
 %{__cp} ./scripts/packages/bazel.sh %{buildroot}/%{_bindir}/bazel
 
-%files
+%files devel
 %dir %{_datadir}/bazel
 %license %{_datadir}/bazel/LICENSE
 %if "%{version}" == "4.2.1"
@@ -103,12 +119,14 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 %{_bindir}/bazel-%{bazel_version}
 %{bashcompdir}/bazel
 
-# Uncomment if you want to see the buildroot
-# ex/ to verify that bazel-real was not strippped
-# %clean
-# echo "no cleaning for you"
-
 %changelog
+* Sat Oct 16 2021 <trix@redhat.com> - 3.7.2-3
+- Define/use gcc_major in bazel args
+- For mock, use local jdk instead of trying to download one
+- For mock, require python-unversioned-command because some use of 'python'
+- Remove debugging cruft
+- java devel is required, bazel devel is required
+
 * Thu Oct 14 2021 <trix@redhat.com> - 3.7.2-2
 - Restore bazel4 requires on java-11-openjdk-devel
 
