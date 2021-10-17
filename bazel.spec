@@ -3,7 +3,7 @@ Summary:        A java based build system
 Version:        3.7.2
 Release:        4%{?dist}
 License:        ASL 2.0
-ExclusiveArch:  x86_64
+ExclusiveArch:  x86_64 aarch64
 URL:            http://bazel.io/
 Source0:        https://github.com/bazelbuild/bazel/releases/download/%{version}/bazel-%{version}-dist.zip
 
@@ -106,6 +106,7 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 * Sun Oct 17 2021 <trix@redhat.com> - 3.7.2-4
 - Remove 4.2.1 cruft
 - Order build requires list alphabetically
+- builds on aarch64
 
 * Sat Oct 16 2021 <trix@redhat.com> - 3.7.2-3
 - Define/use gcc_major in bazel args
