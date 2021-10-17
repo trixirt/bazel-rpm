@@ -1,10 +1,9 @@
 Name:           bazel
 Summary:        A java based build system
 Version:        3.7.2
-Release:        3%{?dist}
+Release:        4%{?dist}
 License:        ASL 2.0
 ExclusiveArch:  x86_64
-
 URL:            http://bazel.io/
 Source0:        https://github.com/bazelbuild/bazel/releases/download/%{version}/bazel-%{version}-dist.zip
 
@@ -14,22 +13,17 @@ Patch1:         bazel-1.0.0-log-warning.patch
 # Fixes up some include problems with the bootstapped bazel
 # From the original baze4 project
 Patch2:         bazel-gcc.patch
-# For man pages
-# From https://github.com/bazelbuild/bazel/pull/12028/commits
-# Fuzzing of 0 makes it difficult to use.
-# This patch is for 4.2.1
-Patch3:         bazel-manpage.patch
 
 BuildRequires:  bash-completion
-BuildRequires:  java-11-openjdk-devel
-BuildRequires:  zlib-devel
 BuildRequires:  findutils
 BuildRequires:  gcc-c++
-BuildRequires:  which
-BuildRequires:  unzip
-BuildRequires:  zip
+BuildRequires:  java-11-openjdk-devel
 BuildRequires:  python3
 BuildRequires:  python-unversioned-command
+BuildRequires:  unzip
+BuildRequires:  which
+BuildRequires:  zip
+BuildRequires:  zlib-devel
 
 %description
 A java based build system.
@@ -67,9 +61,6 @@ A java based build system.
 %setup -q -c -n bazel-%{version}
 %patch1 -p0
 %patch2 -p0
-%if "%{version}" == "4.2.1"
-%patch3 -p1
-%endif
 # Fix the license file being distributed with execute permissions.
 chmod a-x LICENSE
 
@@ -96,11 +87,6 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 # license
 %{__mkdir_p} %{buildroot}%{_datadir}/bazel
 %{__cp} LICENSE %{buildroot}%{_datadir}/bazel/LICENSE
-%if "%{version}" == "4.2.1"
-# man page
-%{__mkdir_p} %{buildroot}%{_mandir}/man1
-%{__cp} bazel.1 %{buildroot}%{_mandir}/man1/
-%endif
 # bash completion
 %{__mkdir_p} %{buildroot}/%{bashcompdir}
 %{__cp} output/bazel-complete.bash %{buildroot}/%{bashcompdir}/bazel
@@ -112,14 +98,15 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 %files devel
 %dir %{_datadir}/bazel
 %license %{_datadir}/bazel/LICENSE
-%if "%{version}" == "4.2.1"
-%{_mandir}/man1/bazel.1.gz
-%endif
 %{_bindir}/bazel
 %{_bindir}/bazel-%{bazel_version}
 %{bashcompdir}/bazel
 
 %changelog
+* Sun Oct 17 2021 <trix@redhat.com> - 3.7.2-4
+- Remove 4.2.1 cruft
+- Order build requires list alphabetically
+
 * Sat Oct 16 2021 <trix@redhat.com> - 3.7.2-3
 - Define/use gcc_major in bazel args
 - For mock, use local jdk instead of trying to download one
