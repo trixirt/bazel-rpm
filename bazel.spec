@@ -1,17 +1,17 @@
 Name:           bazel
 Summary:        A java based build system
 Version:        3.7.2
-Release:        4%{?dist}
+Release:        5%{?dist}
 License:        ASL 2.0
 ExclusiveArch:  x86_64 aarch64
 URL:            http://bazel.io/
 Source0:        https://github.com/bazelbuild/bazel/releases/download/%{version}/bazel-%{version}-dist.zip
 
 # Silince log.warning bactrace
-# From the original baze4 project
+# From the original bazel4 project
 Patch1:         bazel-1.0.0-log-warning.patch
 # Fixes up some include problems with the bootstapped bazel
-# From the original baze4 project
+# From the original bazel4 project
 Patch2:         bazel-gcc.patch
 
 BuildRequires:  bash-completion
@@ -25,14 +25,14 @@ BuildRequires:  which
 BuildRequires:  zip
 BuildRequires:  zlib-devel
 
-%description
-A java based build system.
-
 Requires:       bash
 # bazel assumes you are building something
 # If you only install java-11-openjdk you will see an error like
 # FATAL: Could not find system javabase. Ensure JAVA_HOME is set, or javac is on your PATH.
 Requires:       java-11-openjdk-devel
+
+%description
+A java based build system.
 
 %package devel
 Summary:        A java based build system
@@ -103,6 +103,9 @@ env ./scripts/generate_bash_completion.sh --bazel=output/bazel --output=output/b
 %{bashcompdir}/bazel
 
 %changelog
+* Mon Oct 18 2021 <trix@redhat.com> - 3.7.2-5
+- Move requires list out of description
+
 * Sun Oct 17 2021 <trix@redhat.com> - 3.7.2-4
 - Remove 4.2.1 cruft
 - Order build requires list alphabetically
